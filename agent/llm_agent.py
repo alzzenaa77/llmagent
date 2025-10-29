@@ -3,315 +3,313 @@ import google.generativeai as genai
 from datetime import datetime, timedelta
 import json
 import logging
-import re
 
 logger = logging.getLogger(__name__)
 
 class LLMAgent:
-    """LLM Agent using Google Gemini"""
+    """LLM Agent using Google Gemini with Function Calling"""
     
-    def __init__(self, api_key: str, model_name: str = "gemini-2.0-flash-exp"):
+    def __init__(self, api_key: str, model_name: str = "gemini-2.0-flash-exp", 
+                 enable_calendar: bool = False):
         """
         Initialize LLM Agent
         
         Args:
             api_key: Google Gemini API key
-            model_name: Model to use (default: gemini-2.0-flash-exp)
+            model_name: Model to use
+            enable_calendar: Enable calendar tools (requires calendar_agent)
         """
         self.api_key = api_key
         self.model_name = model_name
+        self.enable_calendar = enable_calendar
         
         # Configure Gemini
         genai.configure(api_key=self.api_key)
         
-        # Initialize model
-        self.model = genai.GenerativeModel(model_name=self.model_name)
-
-        # System instruction will be added in first message
-        self.system_prompt = """Kamu adalah asisten AI yang membantu dan ramah. 
-        Kamu bisa:
-        - Menjawab pertanyaan umum
-        - Memberikan penjelasan tentang berbagai topik
-        - Membantu brainstorming ide
-        - Memberikan saran dan tips
-
-        Selalu jawab dengan bahasa Indonesia yang santai dan mudah dipahami."""
+        # System prompt with calendar awareness
+        self.system_prompt = self._build_system_prompt()
+        
+        # Setup tools
+        self.tools = None
+        if self.enable_calendar:
+            self.tools = self._setup_calendar_tools()
+        
+        # Initialize model with tools
+        self.model = genai.GenerativeModel(
+            model_name=self.model_name,
+            tools=self.tools,
+            system_instruction=self.system_prompt
+        )
         
         # Chat history storage
         self.chat_sessions = {}
         
-    def chat(self, user_id: str, message: str) -> str:
-        """
-        Send message to LLM and get response
+        logger.info(f"✅ LLM Agent initialized (Calendar: {'ON' if enable_calendar else 'OFF'})")
+    
+    def _build_system_prompt(self) -> str:
+        """Build system prompt based on capabilities"""
         
-        Args:
-            user_id: Unique user identifier
-            message: User message
-            
-        Returns:
-            AI response
-        """
-        try:
-            # Get or create chat session for user
-            if user_id not in self.chat_sessions:
-                # Start new chat with system prompt as first message
-                self.chat_sessions[user_id] = self.model.start_chat(
-                    history=[
-                        {"role": "user", "parts": [self.system_prompt]},
-                        {"role": "model", "parts": ["Baik, saya siap membantu!"]}
-                    ]
+        base_prompt = """Kamu adalah asisten AI yang helpful dan friendly.
+
+PERSONALITY:
+- Ramah, santai, tapi profesional
+- Gunakan emoji secukupnya (jangan berlebihan)
+- Jawab dalam Bahasa Indonesia yang natural
+
+CAPABILITIES:"""
+        
+        if self.enable_calendar:
+            base_prompt += """
+- Chat biasa untuk pertanyaan umum
+- **Manage Google Calendar** menggunakan tools yang tersedia
+
+CRITICAL: JIKA DETECT CALENDAR REQUEST, LANGSUNG USE TOOL!
+
+CALENDAR KEYWORDS (AUTO TRIGGER TOOL):
+- jadwal, schedule, agenda, meeting, rapat, event, acara
+- tambah, tambahkan, buatkan, jadwalin, schedule
+- apa jadwal, lihat agenda, cek event, tampilkan jadwal
+- hapus, cancel, batalkan, ubah, update, reschedule
+
+TOOLS AVAILABLE:
+1. add_calendar_event - Create event
+2. list_calendar_events - List events  
+3. delete_calendar_event - Delete event
+4. update_calendar_event - Update event
+
+DATE/TIME RULES:
+- "hari ini" = {today}
+- "besok" = {tomorrow}
+- "lusa" = {day_after_tomorrow}
+- "pagi"=09:00, "siang"=12:00, "sore"=15:00, "malam"=19:00
+- "jam 2" = 14:00
+
+EXAMPLES:
+User: "tambahkan jadwal besok jam 2"
+→ USE: add_calendar_event(title="Jadwal", date="{tomorrow}", time="14:00", duration=60)
+
+User: "apa jadwalku hari ini?"
+→ USE: list_calendar_events(date="{today}")
+"""
+        else:
+            base_prompt += """
+- Chat untuk pertanyaan umum
+- Membantu brainstorming
+- Memberikan penjelasan dan tips
+"""
+        
+        base_prompt += """
+
+RESPONSE STYLE:
+- Natural dan informatif
+- Konfirmasi detail setelah execute tool
+"""
+        
+        # Inject dates
+        today = datetime.now().strftime("%Y-%m-%d")
+        tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+        day_after = (datetime.now() + timedelta(days=2)).strftime("%Y-%m-%d")
+        
+        base_prompt = base_prompt.replace("{today}", today)
+        base_prompt = base_prompt.replace("{tomorrow}", tomorrow)
+        base_prompt = base_prompt.replace("{day_after_tomorrow}", day_after)
+        
+        return base_prompt
+    
+    def _setup_calendar_tools(self) -> list:
+        """Setup calendar tools"""
+        from agent.tools.calendar_tools import CALENDAR_TOOLS
+        
+        # Convert to proper format
+        tool_declarations = []
+        
+        for tool_dict in CALENDAR_TOOLS:
+            func_decl = genai.protos.FunctionDeclaration(
+                name=tool_dict['name'],
+                description=tool_dict['description'],
+                parameters=genai.protos.Schema(
+                    type=genai.protos.Type.OBJECT,
+                    properties={
+                        k: genai.protos.Schema(
+                            type=self._get_proto_type(v.get('type')),
+                            description=v.get('description', '')
+                        )
+                        for k, v in tool_dict['parameters']['properties'].items()
+                    },
+                    required=tool_dict['parameters'].get('required', [])
                 )
+            )
+            tool_declarations.append(func_decl)
+        
+        logger.info(f"✅ Loaded {len(tool_declarations)} calendar tools")
+        for decl in tool_declarations:
+            logger.info(f"   - {decl.name}")
+        
+        return [genai.protos.Tool(function_declarations=tool_declarations)]
+    
+    def _get_proto_type(self, type_str: str):
+        """Convert JSON schema type to protobuf Type"""
+        type_map = {
+            'string': genai.protos.Type.STRING,
+            'integer': genai.protos.Type.INTEGER,
+            'number': genai.protos.Type.NUMBER,
+            'boolean': genai.protos.Type.BOOLEAN,
+            'array': genai.protos.Type.ARRAY,
+            'object': genai.protos.Type.OBJECT
+        }
+        return type_map.get(type_str, genai.protos.Type.STRING)
+    
+    def _extract_function_calls_from_raw(self, response):
+        """
+        Extract function calls from raw response
+        This is a workaround for empty name bug
+        """
+        function_calls = []
+        
+        try:
+            # Try to get raw proto message
+            if hasattr(response, '_result'):
+                raw = response._result
+                logger.info(f"🔍 Raw result type: {type(raw)}")
+                
+                # Try to serialize to dict
+                try:
+                    if hasattr(raw, 'to_dict'):
+                        raw_dict = raw.to_dict()
+                        logger.info(f"🔍 Raw dict keys: {raw_dict.keys()}")
+                        
+                        # Navigate to function calls
+                        if 'candidates' in raw_dict:
+                            for candidate in raw_dict['candidates']:
+                                if 'content' in candidate and 'parts' in candidate['content']:
+                                    for part in candidate['content']['parts']:
+                                        if 'function_call' in part:
+                                            fc_dict = part['function_call']
+                                            logger.info(f"🔍 Found function_call dict: {fc_dict}")
+                                            
+                                            if 'name' in fc_dict and fc_dict['name']:
+                                                function_calls.append(fc_dict)
+                                                logger.info(f"✅ Extracted: {fc_dict['name']}")
+                except Exception as e:
+                    logger.error(f"❌ Error serializing raw: {e}")
+            
+            # Alternative: Try to serialize response candidates directly
+            if not function_calls and response.candidates:
+                candidate = response.candidates[0]
+                
+                # Try to_dict on candidate
+                try:
+                    if hasattr(candidate, 'to_dict'):
+                        cand_dict = candidate.to_dict()
+                        logger.info(f"🔍 Candidate dict: {json.dumps(cand_dict, indent=2)[:500]}")
+                        
+                        if 'content' in cand_dict and 'parts' in cand_dict['content']:
+                            for part in cand_dict['content']['parts']:
+                                if 'function_call' in part:
+                                    fc_dict = part['function_call']
+                                    if 'name' in fc_dict and fc_dict['name']:
+                                        function_calls.append(fc_dict)
+                                        logger.info(f"✅ Extracted from candidate: {fc_dict['name']}")
+                except Exception as e:
+                    logger.error(f"❌ Error with candidate to_dict: {e}")
+        
+        except Exception as e:
+            logger.error(f"❌ Raw extraction error: {e}", exc_info=True)
+        
+        return function_calls
+    
+    def _execute_function(self, function_call_dict) -> dict:
+        """Execute function call from dict"""
+        function_name = function_call_dict.get('name')
+        function_args = function_call_dict.get('args', {})
+        
+        logger.info(f"🔧 Executing: {function_name}")
+        logger.info(f"   Args: {json.dumps(function_args, indent=2)}")
+        
+        try:
+            from agent.tools import calendar_tools
+            
+            if function_name == "add_calendar_event":
+                result = calendar_tools.add_calendar_event(**function_args)
+            elif function_name == "list_calendar_events":
+                result = calendar_tools.list_calendar_events(**function_args)
+            elif function_name == "delete_calendar_event":
+                result = calendar_tools.delete_calendar_event(**function_args)
+            elif function_name == "update_calendar_event":
+                result = calendar_tools.update_calendar_event(**function_args)
+            else:
+                result = {
+                    'success': False,
+                    'error': f"Unknown function: {function_name}"
+                }
+            
+            logger.info(f"✅ Executed successfully")
+            return result
+            
+        except Exception as e:
+            logger.error(f"❌ Execution error: {e}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
+    
+    def process(self, user_id: str, message: str) -> str:
+        """Main processing with function calling"""
+        try:
+            # Get or create chat session
+            if user_id not in self.chat_sessions:
+                self.chat_sessions[user_id] = self.model.start_chat(history=[])
             
             chat = self.chat_sessions[user_id]
             
-            # Send message and get response
+            # Send message
+            logger.info(f"📨 User: {message[:100]}...")
             response = chat.send_message(message)
             
-            return response.text
+            # Try to extract function calls from raw response
+            function_calls = self._extract_function_calls_from_raw(response)
+            
+            logger.info(f"🔍 Extracted {len(function_calls)} function call(s)")
+            
+            # If no function calls, return text
+            if not function_calls:
+                logger.info("💬 No function calls, returning text")
+                return response.text
+            
+            # Execute function calls
+            logger.info(f"🔧 Executing {len(function_calls)} function(s)...")
+            
+            response_parts = []
+            for fc_dict in function_calls:
+                result = self._execute_function(fc_dict)
+                
+                # Build function response part
+                response_parts.append(
+                    genai.protos.Part(
+                        function_response=genai.protos.FunctionResponse(
+                            name=fc_dict['name'],
+                            response={'result': result}
+                        )
+                    )
+                )
+            
+            # Get final response
+            logger.info("🤖 Getting final response...")
+            final_response = chat.send_message(response_parts)
+            
+            logger.info("✅ Process completed")
+            return final_response.text
             
         except Exception as e:
-            logger.error(f"Chat error: {e}")
+            logger.error(f"❌ Process error: {e}", exc_info=True)
             return f"❌ Error: {str(e)}"
     
-    def parse_calendar_intent(self, message: str) -> dict:
-        """
-        Parse calendar intent from natural language
-        
-        Args:
-            message: User message
-            
-        Returns:
-            Dictionary with parsed intent
-        """
-        try:
-            today = datetime.now()
-            tomorrow = today + timedelta(days=1)
-            
-            today_str = today.strftime("%Y-%m-%d")
-            tomorrow_str = tomorrow.strftime("%Y-%m-%d")
-            day_name = today.strftime("%A")
-            current_time = datetime.now().strftime("%H:%M")
-            
-            # Create simpler, more direct prompt
-            system_prompt = f"""You are a JSON parser for Google Calendar commands. You MUST respond with ONLY valid JSON, nothing else.
-
-Current context:
-- Today: {today_str} ({day_name})
-- Tomorrow: {tomorrow_str}
-- Current time: {current_time}
-
-Parse the user command and extract:
-- action: "create", "read", "update", or "delete"
-- title: event title (for create/update)
-- date: date in YYYY-MM-DD format
-- time: time in HH:MM format (24-hour)
-- duration: duration in minutes (default 60)
-- description: event description (optional)
-- event_id: event ID (for update/delete)
-- days: number of days (for read, default 7)
-
-Date parsing rules:
-- "besok" = {tomorrow_str}
-- "hari ini" = {today_str}
-- "lusa" = {(today + timedelta(days=2)).strftime("%Y-%m-%d")}
-- If no specific date for "read", omit the "date" field
-
-Time parsing rules:
-- "pagi" = 09:00
-- "siang" = 12:00
-- "sore" = 15:00
-- "malam" = 19:00
-- "jam 2" or "jam 14" = convert to HH:MM format
-- "2 siang" = 14:00
-
-User command: "{message}"
-
-Respond with ONLY the JSON object, no markdown, no explanation:"""
-            
-            # Get response from Gemini
-            response = self.model.generate_content(system_prompt)
-            response_text = response.text.strip()
-            
-            logger.info(f"Raw Gemini response: {response_text}")
-            
-            # Clean response - remove markdown, backticks, extra text
-            response_text = response_text.replace('```json', '').replace('```', '').strip()
-            
-            # Try to extract JSON from response if it contains extra text
-            json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
-            if json_match:
-                response_text = json_match.group(0)
-            
-            logger.info(f"Cleaned response: {response_text}")
-            
-            # Parse JSON
-            intent = json.loads(response_text)
-            
-            logger.info(f"Parsed intent: {intent}")
-            
-            # Validate action
-            valid_actions = ['create', 'read', 'update', 'delete']
-            if intent.get('action') not in valid_actions:
-                logger.warning(f"Invalid action: {intent.get('action')}")
-                return None
-            
-            # Validate required fields per action
-            action = intent.get('action')
-            
-            if action == 'create':
-                required = ['title', 'date', 'time']
-                missing = [field for field in required if field not in intent or not intent[field]]
-                if missing:
-                    logger.warning(f"Missing required fields for create: {missing}")
-                    return None
-            
-            elif action in ['update', 'delete']:
-                if 'event_id' not in intent or not intent['event_id']:
-                    logger.warning(f"Missing event_id for {action}")
-                    return None
-            
-            # Set defaults
-            if action == 'create' and 'duration' not in intent:
-                intent['duration'] = 60
-            
-            if action == 'read' and 'date' not in intent and 'days' not in intent:
-                intent['days'] = 7
-            
-            return intent
-            
-        except json.JSONDecodeError as e:
-            logger.error(f"JSON Parse Error: {e}")
-            logger.error(f"Response text was: {response_text}")
-            
-            # Fallback: Try manual parsing for common patterns
-            return self._fallback_parse(message, today_str, tomorrow_str)
-            
-        except Exception as e:
-            logger.error(f"Parse intent error: {e}", exc_info=True)
-            return None
-    
-    def _fallback_parse(self, message: str, today_str: str, tomorrow_str: str) -> dict:
-        """
-        Fallback manual parsing when Gemini fails
-        
-        Args:
-            message: User message
-            today_str: Today's date string
-            tomorrow_str: Tomorrow's date string
-        """
-        try:
-            message_lower = message.lower()
-            logger.info(f"Using fallback parser for: {message}")
-            
-            # Detect action
-            if any(word in message_lower for word in ['buat', 'buatkan', 'jadwal', 'jadwalkan', 'tambah']):
-                action = 'create'
-            elif any(word in message_lower for word in ['tampil', 'tampilkan', 'lihat', 'cek', 'jadwal']):
-                action = 'read'
-            elif any(word in message_lower for word in ['hapus', 'delete']):
-                action = 'delete'
-            elif any(word in message_lower for word in ['update', 'ubah', 'ganti']):
-                action = 'update'
-            else:
-                logger.warning("Could not detect action in fallback parse")
-                return None
-            
-            intent = {'action': action}
-            
-            # Parse based on action
-            if action == 'create':
-                # Extract date
-                if 'besok' in message_lower:
-                    intent['date'] = tomorrow_str
-                elif 'hari ini' in message_lower:
-                    intent['date'] = today_str
-                else:
-                    # Default to tomorrow if no date specified
-                    intent['date'] = tomorrow_str
-                
-                # Extract time
-                if 'pagi' in message_lower:
-                    intent['time'] = '09:00'
-                elif 'siang' in message_lower:
-                    intent['time'] = '12:00'
-                elif 'sore' in message_lower:
-                    intent['time'] = '15:00'
-                elif 'malam' in message_lower:
-                    intent['time'] = '19:00'
-                else:
-                    # Try to extract "jam X"
-                    time_match = re.search(r'jam\s+(\d+)', message_lower)
-                    if time_match:
-                        hour = int(time_match.group(1))
-                        if hour <= 12 and 'siang' not in message_lower:
-                            hour += 12  # Assume PM if not specified
-                        intent['time'] = f"{hour:02d}:00"
-                    else:
-                        intent['time'] = '14:00'  # Default 2 PM
-                
-                # Extract title (everything before date/time words)
-                title_words = []
-                skip_words = ['buat', 'buatkan', 'jadwal', 'jadwalkan', 'besok', 'hari', 'ini', 
-                             'jam', 'pagi', 'siang', 'sore', 'malam', 'selama']
-                for word in message.split():
-                    if word.lower() not in skip_words and not word.isdigit():
-                        title_words.append(word)
-                    if word.lower() in ['besok', 'jam']:
-                        break
-                
-                intent['title'] = ' '.join(title_words) if title_words else 'Event'
-                intent['duration'] = 60
-                
-                logger.info(f"Fallback parsed CREATE: {intent}")
-                return intent
-            
-            elif action == 'read':
-                if 'hari ini' in message_lower:
-                    intent['date'] = today_str
-                elif 'besok' in message_lower:
-                    intent['date'] = tomorrow_str
-                else:
-                    intent['days'] = 7
-                
-                logger.info(f"Fallback parsed READ: {intent}")
-                return intent
-            
-            elif action == 'delete':
-                # Try to extract event ID
-                id_match = re.search(r'event\s+([a-zA-Z0-9_-]+)', message_lower)
-                if id_match:
-                    intent['event_id'] = id_match.group(1)
-                    logger.info(f"Fallback parsed DELETE: {intent}")
-                    return intent
-                else:
-                    logger.warning("Could not extract event_id in fallback")
-                    return None
-            
-            elif action == 'update':
-                # Try to extract event ID
-                id_match = re.search(r'event\s+([a-zA-Z0-9_-]+)', message_lower)
-                if id_match:
-                    intent['event_id'] = id_match.group(1)
-                    
-                    # Extract new title if present
-                    title_match = re.search(r'judul(?:nya)?\s+jadi\s+(.+)', message_lower)
-                    if title_match:
-                        intent['title'] = title_match.group(1).strip()
-                    
-                    logger.info(f"Fallback parsed UPDATE: {intent}")
-                    return intent
-                else:
-                    logger.warning("Could not extract event_id in fallback")
-                    return None
-            
-            return None
-            
-        except Exception as e:
-            logger.error(f"Fallback parse error: {e}", exc_info=True)
-            return None
+    def chat(self, user_id: str, message: str) -> str:
+        """Simple chat (delegates to process)"""
+        return self.process(user_id, message)
     
     def clear_history(self, user_id: str) -> str:
-        """Clear chat history for a user"""
+        """Clear chat history"""
         if user_id in self.chat_sessions:
             del self.chat_sessions[user_id]
             return "✅ Chat history cleared!"
@@ -319,51 +317,40 @@ Respond with ONLY the JSON object, no markdown, no explanation:"""
     
     def get_help(self) -> str:
         """Get help message"""
-        return """
-🤖 **Bot Commands:**
+        base_help = """
+🤖 **Bot Help:**
 
-**Chat Commands:**
-- `!chat <message>` - Chat dengan AI
-- `!clear` - Hapus riwayat chat kamu
+**Natural Chat:**
+Just talk naturally! Examples:
+- "jadwalin meeting besok jam 2"
+- "apa jadwalku hari ini?"
+- "tambahkan reminder olahraga jumat pagi"
+"""
+        
+        if self.enable_calendar:
+            base_help += """
+**Calendar Keywords:**
+- jadwal, schedule, meeting, event
+- tambahkan, buatkan, jadwalin
+- apa jadwalku, lihat agenda
 
-**Calendar Commands (Natural Language):**
-- `!cal buatkan meeting besok jam 2 siang`
-- `!cal jadwalkan interview jumat pukul 10 pagi selama 2 jam`
-- `!cal tampilkan jadwal hari ini`
-- `!cal apa jadwalku minggu ini`
-- `!cal hapus event <event_id>`
-- `!cal update event <event_id> judulnya jadi <judul baru>`
-
-**Calendar Commands (Manual):**
-- `!create_event "<title>" YYYY-MM-DD HH:MM <duration>`
-- `!list_events <days>`
-- `!delete_event <event_id>`
-
-**Other Commands:**
-- `!help` - Lihat pesan ini
-- `!stats` - Statistik bot
-- `!ping` - Cek latency bot
-
-**Examples:**
-- `!chat Jelaskan tentang AI`
-- `!cal buatkan rapat besok pagi`
-- `!create_event "Team Meeting" 2025-10-29 14:00 60`
-- `!list_events 7`
-
-**Features:**
-✅ Conversational AI dengan memory
-✅ Natural language calendar commands
-✅ Google Calendar integration (CRUD)
-✅ Multi-user support
-        """
+**Commands:**
+- `!list_events` - List events
+- `!clear` - Clear chat
+- `!help` - This message
+"""
+        
+        return base_help
     
     def get_stats(self) -> str:
-        """Get bot statistics"""
+        """Get stats"""
         active_users = len(self.chat_sessions)
+        calendar_status = "✅ Enabled" if self.enable_calendar else "❌ Disabled"
+        
         return f"""
 📊 **Bot Statistics:**
-- Active chat users: {active_users}
-- LLM Model: {self.model_name}
-- Calendar: ✅ Integrated
+- Active users: {active_users}
+- Model: {self.model_name}
+- Calendar: {calendar_status}
 - Status: ✅ Online
         """
