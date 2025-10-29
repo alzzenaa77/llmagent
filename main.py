@@ -1,7 +1,8 @@
 import os
 from dotenv import load_dotenv
 from agent.llm_agent import LLMAgent
-from agent.calendar_agent import CalendarAgent
+from agent.tools import calendar_tools  # 👈 Tambah ini
+from agent.tools.calendar_tools import initialize_calendar_agent
 from bot.discord_bot import DiscordBot
 import logging
 
@@ -47,22 +48,18 @@ def main():
     print("="*60)
     
     try:
-        # Initialize LLM Agent
-        print("\n🧠 Initializing LLM Agent...")
-        agent = LLMAgent(api_key=gemini_api_key, model_name=llm_model)
-        print("✅ LLM Agent initialized!")
-        
-        # Initialize Calendar Agent (optional)
-        calendar_agent = None
+        # Initialize Calendar Tools first (if credentials exist)
+        enable_calendar = False
         if os.path.exists(credentials_path):
-            print("\n📅 Initializing Calendar Agent...")
+            print("\n📅 Initializing Calendar Tools...")
             try:
-                calendar_agent = CalendarAgent(
+                calendar_tools.initialize_calendar_agent(
                     credentials_path=credentials_path,
                     token_path=token_path
                 )
-                print("✅ Calendar Agent initialized!")
-                print("   Calendar features: ENABLED")
+                enable_calendar = True
+                print("✅ Calendar Tools initialized!")
+                print("   Calendar features: ENABLED (Function Calling)")
             except FileNotFoundError as e:
                 print(f"⚠️  Calendar setup incomplete: {e}")
                 print("   Calendar features: DISABLED")
@@ -80,12 +77,21 @@ def main():
             print("   4. Download credentials.json")
             print("   5. Place in: credentials/credentials.json")
         
+        # Initialize LLM Agent with calendar integration
+        print("\n🧠 Initializing LLM Agent with Function Calling...")
+        agent = LLMAgent(
+            api_key=gemini_api_key,
+            model_name=llm_model,
+            enable_calendar=enable_calendar  # 👈 Enable calendar function calling
+        )
+        print("✅ LLM Agent initialized with Function Calling!")
+        
         # Initialize Discord Bot
         print("\n🤖 Initializing Discord Bot...")
         bot = DiscordBot(
             token=discord_token,
             agent=agent,
-            calendar_agent=calendar_agent,
+            calendar_agent=None,  # 👈 Gak perlu lagi, sudah terintegrasi di LLMAgent
             prefix=bot_prefix
         )
         print("✅ Discord Bot initialized!")
@@ -96,11 +102,13 @@ def main():
         print("   • !help - Show all commands")
         print("   • !stats - Bot statistics")
         print("   • !ping - Check latency")
-        if calendar_agent:
-            print("   • !cal <command> - Natural language calendar")
-            print("   • !create_event - Manual event creation")
-            print("   • !list_events - List events")
-            print("   • !delete_event - Delete event")
+        if enable_calendar:
+            print("\n📅 Calendar Commands (Natural Language):")
+            print("   Just chat naturally! Examples:")
+            print("   • 'jadwalin meeting besok jam 10'")
+            print("   • 'apa jadwalku hari ini?'")
+            print("   • 'update meeting jam 2 jadi jam 4'")
+            print("   • 'hapus jadwal meeting'")
         
         # Run bot
         print("\n🚀 Starting bot...\n")

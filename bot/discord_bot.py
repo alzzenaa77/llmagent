@@ -56,6 +56,42 @@ class DiscordBot:
                 )
             )
         
+        # 👇 TAMBAHKAN INI - Handler untuk semua message
+        @self.bot.event
+        async def on_message(message):
+            # Ignore bot's own messages
+            if message.author == self.bot.user:
+                return
+            
+            # Process commands first (yang pakai prefix !)
+            await self.bot.process_commands(message)
+            
+            # If message starts with prefix, skip auto-reply
+            if message.content.startswith(self.bot.command_prefix):
+                return
+            
+            # Auto-reply untuk chat biasa (tanpa prefix)
+            try:
+                async with message.channel.typing():
+                    user_id = str(message.author.id)
+                    
+                    # Gunakan agent.process() yang sudah support function calling
+                    response = self.agent.process(user_id, message.content)
+                    
+                    # Send response (split if too long)
+                    if len(response) > 2000:
+                        chunks = [response[i:i+2000] for i in range(0, len(response), 2000)]
+                        for chunk in chunks:
+                            await message.channel.send(chunk)
+                    else:
+                        await message.channel.send(response)
+                    
+                    logger.info(f"User {message.author.name} chatted: {message.content[:50]}...")
+                    
+            except Exception as e:
+                logger.error(f"Auto-reply error: {e}")
+                await message.channel.send(f"❌ Error: {str(e)}")
+        
         @self.bot.event
         async def on_command_error(ctx, error):
             if isinstance(error, commands.MissingRequiredArgument):
