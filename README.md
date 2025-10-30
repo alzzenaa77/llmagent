@@ -145,7 +145,7 @@ Create a `.env` file in the project root:
 ```bash
 # .env file
 GEMINI_API_KEY=your_gemini_api_key_here
-DISCORD_TOKEN=your_discord_bot_token_here  # Optional, for Discord bot
+DISCORD_TOKEN=your_discord_bot_token_here  
 ```
 
 ⚠️ **Security Note:** Never commit `.env` file to git! It's already in `.gitignore`.
