@@ -1,7 +1,7 @@
-# 🗓️ Schedbot Discord - LLM Agent untuk Manajemen Jadwal
+# 🗓️ Schedbot Discord - *AI Calendar Assistant*
 SchedBot merupakan chatbot Discord berbasis Large Language Model (LLM) yang memanfaatkan API Google Gemini AI dan dirancang untuk membantu pengguna dalam mengatur dan menyusun jadwal harian secara otomatis melalui integrasi langsung dengan Google Calendar. <br>
 
-Anggota Kelompok: <br>
+## 👥 Anggota Kelompok: <br>
 | Nama Lengkap | NIM |
 |---------------|-------------------|
 | Della Febi Alfian | 22/505892/TK/55393 |
@@ -296,7 +296,7 @@ pytest --cov=agent --cov-report=html
 
 
 ## 💡 *Essential Links*
-Link Demo: https://drive.google.com/drive/folders/1FPcu1RkJKglmezaZvpMcMOtkm3f9YWk3
+Link Demo: https://drive.google.com/drive/folders/1FPcu1RkJKglmezaZvpMcMOtkm3f9YWk3 </br>
 Link Notion: https://www.notion.so/Pengembangan-LLM-Agent-Chatbot-Schedbot-sebagai-Asisten-Manajemen-Jadwal-terintegrasi-dengan-Googl-29a0fb4506398002b24ad07c4257d4eb?source=copy_link
 
 
