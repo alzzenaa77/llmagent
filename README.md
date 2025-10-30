@@ -28,8 +28,6 @@ Menghapus jadwal tertentu bila sudah tidak diperlukan.<br>
 Berinteraksi dengan user melalui Discord bot <br>
 <img width="979" height="643" alt="image" src="https://github.com/user-attachments/assets/c06bfa99-f418-495a-9bcd-74bda37db3fd" />
 
-
-```
 ## 📦 *Tech Stack Flow*
 <img width="993" height="474" alt="Screenshot 2025-10-30 192044" src="https://github.com/user-attachments/assets/5762f0ab-3a2e-42f2-8208-459c120e8858" />
 
