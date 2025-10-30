@@ -1,9 +1,11 @@
-# Schedbot Discord -- LLM Agent untuk Manajemen Jadwal
+# 🗓️ Schedbot Discord - LLM Agent untuk Manajemen Jadwal
 SchedBot merupakan chatbot Discord berbasis Large Language Model (LLM) yang memanfaatkan API Google Gemini AI dan dirancang untuk membantu pengguna dalam mengatur dan menyusun jadwal harian secara otomatis melalui integrasi langsung dengan Google Calendar. <br>
 
 Anggota Kelompok: <br>
-Della Febi Alfian (22/505892/TK/55393) <br>
-Raffa Alzena Zhafirah (22/505656/TK/55353) <br>
+| Nama Lengkap | NIM |
+|---------------|-------------------|
+| Della Febi Alfian | 22/505892/TK/55393 |
+| Raffa Alzena Zhafirah | 22/505656/TK/55353 |
 
 ## 🚀 Fitur Utama Schedbot
 1. **Create Jadwal**<br> 
@@ -40,38 +42,40 @@ Berinteraksi dengan user melalui Discord bot <br>
    
 
 ## 📂 Struktur Proyek
-LLMAGENT/<br>
-├─ agent/<br>
-│  ├─ tools/<br>
-│  │  ├─ __init__.py                # Mendaftarkan tool untuk agent<br>
-│  │  ├─ calendar_tools.py          # Tool utilitas kalender (create, read, update)<br>
-│  │<br>
-│  ├─ calendar_agent.py             # Agent untuk manajemen kalender<br>
-│  ├─ llm_agent.py                  # Core logic & reasoning LLM<br>
-│<br>
-│  ├─ bot/<br>
-│  │  ├─ discord_bot.py             # Integrasi dengan Discord bot<br>
-│<br>
-│  ├─ credentials/<br>
-│  │  ├─ credentials.json           # Data client API<br>
-│  │  └─ token.json                 # Token autentikasi<br>
-│<br>
-├─ node_modules/                    # Dependensi npm<br>
-│<br>
-├─ tests/<br>
-│  ├─ test_calendar.py              # Unit test untuk fungsi kalender<br>
-│<br>
-├─ .env                             # Variabel lingkungan<br>
-├─ .gitignore                       # File untuk mengecualikan dari git tracking<br>
-├─ main.py                          # Entry point utama<br>
-├─ package.json                     # Konfigurasi npm dependencies<br>
-├─ package-lock.json                # Lock versi npm dependencies<br>
-├─ README.md                        # Dokumentasi proyek<br>
-├─ requirements.txt                 # Dependensi Python<br>
-├─ test_agent.py                    # Unit test untuk agent<br>
-└─ test_tools_wrapper.py            # Test untuk wrapper tools<br>
+```
+LLMAGENT/
+├─ agent/
+│  ├─ tools/
+│  │  ├─ __init__.py                # Mendaftarkan tool untuk agent
+│  │  ├─ calendar_tools.py          # Tool utilitas kalender (create, read, update)
+│  │
+│  ├─ calendar_agent.py             # Agent untuk manajemen kalender
+│  ├─ llm_agent.py                  # Core logic & reasoning LLM
+│
+│  ├─ bot/
+│  │  ├─ discord_bot.py             # Integrasi dengan Discord bot
+│
+│  ├─ credentials/
+│  │  ├─ credentials.json           # Data client API
+│  │  └─ token.json                 # Token autentikasi
+│
+├─ node_modules/                    # Dependensi npm
+│
+├─ tests/
+│  ├─ test_calendar.py              # Unit test untuk fungsi kalender
+│
+├─ .env                             # Variabel lingkungan
+├─ .gitignore                       # File untuk mengecualikan dari git tracking
+├─ main.py                          # Entry point utama
+├─ package.json                     # Konfigurasi npm dependencies
+├─ package-lock.json                # Lock versi npm dependencies
+├─ README.md                        # Dokumentasi proyek
+├─ requirements.txt                 # Dependensi Python
+├─ test_agent.py                    # Unit test untuk agent
+└─ test_tools_wrapper.py            # Test untuk wrapper tools
 
 
+```
 ## 📦 *Tech Stack Flow*
 <img width="993" height="474" alt="Screenshot 2025-10-30 192044" src="https://github.com/user-attachments/assets/5762f0ab-3a2e-42f2-8208-459c120e8858" />
 
