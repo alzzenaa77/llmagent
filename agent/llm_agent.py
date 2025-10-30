@@ -159,6 +159,38 @@ RESPONSE STYLE:
         }
         return type_map.get(type_str, genai.protos.Type.STRING)
     
+    def _extract_function_calls(self, response):
+        """
+        Extract function calls from response - FIXED VERSION
+        Handles both standard parts and raw response extraction
+        """
+        function_calls = []
+        
+        try:
+            # Method 1: Try standard part.function_call access
+            if hasattr(response, 'parts'):
+                for part in response.parts:
+                    # Check if part has function_call and it's not empty
+                    if hasattr(part, 'function_call'):
+                        fc = part.function_call
+                        # Check if function_call has name and it's not empty
+                        if hasattr(fc, 'name') and fc.name:
+                            function_calls.append({
+                                'name': fc.name,
+                                'args': dict(fc.args) if hasattr(fc, 'args') else {}
+                            })
+                            logger.info(f"✅ Extracted via parts: {fc.name}")
+            
+            # Method 2: If no function calls found, try raw extraction
+            if not function_calls:
+                logger.info("🔍 No function calls in parts, trying raw extraction...")
+                function_calls = self._extract_function_calls_from_raw(response)
+            
+        except Exception as e:
+            logger.error(f"❌ Error extracting function calls: {e}", exc_info=True)
+        
+        return function_calls
+    
     def _extract_function_calls_from_raw(self, response):
         """
         Extract function calls from raw response
@@ -194,7 +226,7 @@ RESPONSE STYLE:
                     logger.error(f"❌ Error serializing raw: {e}")
             
             # Alternative: Try to serialize response candidates directly
-            if not function_calls and response.candidates:
+            if not function_calls and hasattr(response, 'candidates') and response.candidates:
                 candidate = response.candidates[0]
                 
                 # Try to_dict on candidate
@@ -253,8 +285,37 @@ RESPONSE STYLE:
                 'error': str(e)
             }
     
+    def _get_text_response(self, response) -> str:
+        """
+        Safely extract text from response
+        Handles cases where response has function_call instead of text
+        """
+        try:
+            # Try to get text from parts
+            if hasattr(response, 'parts'):
+                text_parts = []
+                for part in response.parts:
+                    # Only get text if part has text attribute and it's not empty
+                    if hasattr(part, 'text') and part.text:
+                        text_parts.append(part.text)
+                
+                if text_parts:
+                    return ''.join(text_parts)
+            
+            # Try direct text attribute
+            if hasattr(response, 'text') and response.text:
+                return response.text
+            
+            # If no text found, return empty string
+            logger.warning("⚠️ No text found in response")
+            return ""
+            
+        except Exception as e:
+            logger.error(f"❌ Error getting text response: {e}")
+            return ""
+    
     def process(self, user_id: str, message: str) -> str:
-        """Main processing with function calling"""
+        """Main processing with function calling - FIXED VERSION"""
         try:
             # Get or create chat session
             if user_id not in self.chat_sessions:
@@ -266,15 +327,21 @@ RESPONSE STYLE:
             logger.info(f"📨 User: {message[:100]}...")
             response = chat.send_message(message)
             
-            # Try to extract function calls from raw response
-            function_calls = self._extract_function_calls_from_raw(response)
+            # Extract function calls using the fixed method
+            function_calls = self._extract_function_calls(response)
             
             logger.info(f"🔍 Extracted {len(function_calls)} function call(s)")
             
-            # If no function calls, return text
+            # If no function calls, return text safely
             if not function_calls:
                 logger.info("💬 No function calls, returning text")
-                return response.text
+                text_response = self._get_text_response(response)
+                
+                # If still no text, return default message
+                if not text_response:
+                    return "Maaf, saya tidak bisa memproses permintaan ini. Bisa ulangi dengan cara lain?"
+                
+                return text_response
             
             # Execute function calls
             logger.info(f"🔧 Executing {len(function_calls)} function(s)...")
@@ -297,8 +364,19 @@ RESPONSE STYLE:
             logger.info("🤖 Getting final response...")
             final_response = chat.send_message(response_parts)
             
+            # Safely extract final text
+            final_text = self._get_text_response(final_response)
+            
+            if not final_text:
+                # If no text response after function call, return the function result message
+                if response_parts and 'result' in response_parts[0].function_response.response:
+                    result_data = response_parts[0].function_response.response['result']
+                    if isinstance(result_data, dict) and 'message' in result_data:
+                        return result_data['message']
+                return "✅ Operasi berhasil dilakukan!"
+            
             logger.info("✅ Process completed")
-            return final_response.text
+            return final_text
             
         except Exception as e:
             logger.error(f"❌ Process error: {e}", exc_info=True)

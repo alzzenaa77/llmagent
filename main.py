@@ -1,8 +1,7 @@
 import os
 from dotenv import load_dotenv
 from agent.llm_agent import LLMAgent
-from agent.tools import calendar_tools  # 👈 Tambah ini
-from agent.tools.calendar_tools import initialize_calendar_agent
+from agent.tools import calendar_tools
 from bot.discord_bot import DiscordBot
 import logging
 
@@ -53,7 +52,7 @@ def main():
         if os.path.exists(credentials_path):
             print("\n📅 Initializing Calendar Tools...")
             try:
-                calendar_tools.initialize_calendar_agent(
+                calendar_tools.init_calendar_agent(
                     credentials_path=credentials_path,
                     token_path=token_path
                 )
@@ -82,7 +81,7 @@ def main():
         agent = LLMAgent(
             api_key=gemini_api_key,
             model_name=llm_model,
-            enable_calendar=enable_calendar  # 👈 Enable calendar function calling
+            enable_calendar=enable_calendar
         )
         print("✅ LLM Agent initialized with Function Calling!")
         
@@ -91,7 +90,7 @@ def main():
         bot = DiscordBot(
             token=discord_token,
             agent=agent,
-            calendar_agent=None,  # 👈 Gak perlu lagi, sudah terintegrasi di LLMAgent
+            calendar_agent=None,  # Not needed, integrated in LLMAgent
             prefix=bot_prefix
         )
         print("✅ Discord Bot initialized!")
@@ -102,13 +101,17 @@ def main():
         print("   • !help - Show all commands")
         print("   • !stats - Bot statistics")
         print("   • !ping - Check latency")
+        print("   • !clear - Clear chat history")
+        
         if enable_calendar:
             print("\n📅 Calendar Commands (Natural Language):")
-            print("   Just chat naturally! Examples:")
-            print("   • 'jadwalin meeting besok jam 10'")
-            print("   • 'apa jadwalku hari ini?'")
-            print("   • 'update meeting jam 2 jadi jam 4'")
-            print("   • 'hapus jadwal meeting'")
+            print("   Just chat naturally without prefix! Examples:")
+            print("   • 'Tambahkan jadwal rapat besok jam 10 pagi'")
+            print("   • 'Apa jadwalku hari ini?'")
+            print("   • 'Lihat agenda minggu ini'")
+            print("   • 'Hapus event [event_id]'")
+            print("\n   Or use explicit commands:")
+            print("   • !list_events - List upcoming events")
         
         # Run bot
         print("\n🚀 Starting bot...\n")

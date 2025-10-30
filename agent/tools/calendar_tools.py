@@ -1,85 +1,63 @@
 """
-Calendar Tools Module
-Wrapper functions for CalendarAgent to be used by LLM Agent
+Calendar Tools - Connected to Google Calendar via CalendarAgent
 """
-
-from agent.calendar_agent import CalendarAgent
 import logging
+from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
-# Global calendar agent instance
+# Global CalendarAgent instance
 _calendar_agent = None
 
-import os
-
-def initialize_calendar_agent(credentials_path=None,
-                              token_path=None,
-                              timezone='Asia/Jakarta'):
+def init_calendar_agent(credentials_path='credentials/credentials.json', 
+                       token_path='credentials/token.json'):
     """
-    Initialize calendar agent (call once at startup)
-    
-    Args:
-        credentials_path: Path to credentials.json (default: root/credentials.json)
-        token_path: Path to token.json (default: root/token.json)
-        timezone: Timezone for events
+    Initialize CalendarAgent (call this once at startup)
     """
     global _calendar_agent
     
-    # Use absolute paths if not provided
-    if credentials_path is None:
-        credentials_path = os.path.abspath('credentials.json')
-    if token_path is None:
-        token_path = os.path.abspath('token.json')
-    
-    try:
+    if _calendar_agent is None:
+        from agent.calendar_agent import CalendarAgent
         _calendar_agent = CalendarAgent(
             credentials_path=credentials_path,
             token_path=token_path,
-            timezone=timezone
+            timezone='Asia/Jakarta'
         )
-        logger.info("✅ Calendar tools initialized")
-        return True
-    except Exception as e:
-        logger.error(f"Failed to initialize calendar tools: {e}")
-        return False
-
-def get_calendar_agent():
-    """Get calendar agent instance"""
-    if _calendar_agent is None:
-        raise RuntimeError("Calendar agent not initialized. Call initialize_calendar_agent() first.")
+        logger.info("✅ CalendarAgent initialized in calendar_tools")
+    
     return _calendar_agent
 
-# =====================================================
-# TOOL FUNCTIONS (untuk dipanggil Gemini)
-# =====================================================
+def get_calendar_agent():
+    """Get or initialize CalendarAgent"""
+    global _calendar_agent
+    
+    if _calendar_agent is None:
+        init_calendar_agent()
+    
+    return _calendar_agent
+
+# ====================
+# TOOL FUNCTIONS
+# ====================
 
 def add_calendar_event(title: str, date: str, time: str, 
-                       duration: int = 60, description: str = "") -> dict:
+                       duration: int = 60, description: str = ""):
     """
     Add event to Google Calendar
     
-    This function is designed to be called by Gemini AI via function calling.
-    
     Args:
-        title: Event title/summary
-        date: Date in format YYYY-MM-DD (e.g., "2025-10-28")
-        time: Time in format HH:MM (e.g., "14:00")
+        title: Event title
+        date: Date in YYYY-MM-DD format (e.g. "2024-12-25")
+        time: Time in HH:MM format (e.g. "14:00")
         duration: Duration in minutes (default: 60)
         description: Event description (optional)
     
     Returns:
-        dict: Result with keys:
-            - success: bool
-            - message: str (formatted message)
-            - event_id: str (if success)
-            - link: str (if success)
-    
-    Example:
-        >>> result = add_calendar_event("Meeting", "2025-10-28", "14:00", 60)
-        >>> print(result['message'])
+        dict: Result with success status and message
     """
     try:
+        logger.info(f"📝 Creating event: {title} on {date} at {time}")
+        
         agent = get_calendar_agent()
         result = agent.create_event(
             title=title,
@@ -89,120 +67,67 @@ def add_calendar_event(title: str, date: str, time: str,
             description=description
         )
         
-        logger.info(f"✅ Calendar event added: {title}")
+        logger.info(f"✅ Event created: {result.get('event_id')}")
         return result
         
     except Exception as e:
-        logger.error(f"Failed to add calendar event: {e}")
+        logger.error(f"❌ Error creating event: {e}", exc_info=True)
         return {
             'success': False,
-            'message': f"❌ Error adding event: {str(e)}"
+            'message': f"❌ Error: {str(e)}"
         }
 
-
-def list_calendar_events(date: str = None, days: int = 7) -> dict:
+def list_calendar_events(date: str = None, days: int = 7):
     """
     List events from Google Calendar
     
-    This function is designed to be called by Gemini AI via function calling.
-    
     Args:
         date: Specific date in YYYY-MM-DD format (optional)
-              If provided, shows events for that day only
+              If provided, only shows events on that date
               If None, shows events for next 'days' days
-        days: Number of days ahead to fetch events (default: 7)
+        days: Number of days to fetch (default: 7)
               Only used if date is None
     
     Returns:
-        dict: Result with keys:
-            - success: bool
-            - message: str (formatted list of events)
-            - events: list (raw event data)
-            - count: int (number of events)
-    
-    Example:
-        >>> result = list_calendar_events(days=7)
-        >>> print(result['message'])
+        dict: Result with events list and message
     """
     try:
+        logger.info(f"📅 Listing events: date={date}, days={days}")
+        
         agent = get_calendar_agent()
         result = agent.read_events(date=date, days=days)
         
-        logger.info(f"✅ Listed {result.get('count', 0)} calendar events")
+        logger.info(f"✅ Found {len(result.get('events', []))} events")
         return result
         
     except Exception as e:
-        logger.error(f"Failed to list calendar events: {e}")
+        logger.error(f"❌ Error listing events: {e}", exc_info=True)
         return {
             'success': False,
-            'message': f"❌ Error listing events: {str(e)}",
-            'events': [],
-            'count': 0
+            'message': f"❌ Error: {str(e)}"
         }
-
-
-def delete_calendar_event(event_id: str) -> dict:
-    """
-    Delete event from Google Calendar
-    
-    This function is designed to be called by Gemini AI via function calling.
-    
-    Args:
-        event_id: Google Calendar event ID
-    
-    Returns:
-        dict: Result with keys:
-            - success: bool
-            - message: str (confirmation or error message)
-    
-    Example:
-        >>> result = delete_calendar_event("abc123xyz")
-        >>> print(result['message'])
-    """
-    try:
-        agent = get_calendar_agent()
-        result = agent.delete_event(event_id=event_id)
-        
-        logger.info(f"✅ Calendar event deleted: {event_id}")
-        return result
-        
-    except Exception as e:
-        logger.error(f"Failed to delete calendar event: {e}")
-        return {
-            'success': False,
-            'message': f"❌ Error deleting event: {str(e)}"
-        }
-
 
 def update_calendar_event(event_id: str, title: str = None, 
                          date: str = None, time: str = None,
-                         duration: int = None, description: str = None) -> dict:
+                         duration: int = None, description: str = None):
     """
     Update event in Google Calendar
-    
-    This function is designed to be called by Gemini AI via function calling.
     
     Args:
         event_id: Event ID to update
         title: New title (optional)
-        date: New date in YYYY-MM-DD (optional)
-        time: New time in HH:MM (optional)
+        date: New date in YYYY-MM-DD format (optional)
+        time: New time in HH:MM format (optional)
         duration: New duration in minutes (optional)
         description: New description (optional)
     
     Returns:
-        dict: Result with keys:
-            - success: bool
-            - message: str (confirmation or error message)
-    
-    Example:
-        >>> result = update_calendar_event("abc123", title="New Title")
-        >>> print(result['message'])
+        dict: Result with success status and message
     """
     try:
-        agent = get_calendar_agent()
+        logger.info(f"✏️ Updating event: {event_id}")
         
-        # Build update kwargs (only non-None values)
+        # Build kwargs for update
         update_kwargs = {}
         if title is not None:
             update_kwargs['title'] = title
@@ -215,128 +140,144 @@ def update_calendar_event(event_id: str, title: str = None,
         if description is not None:
             update_kwargs['description'] = description
         
+        agent = get_calendar_agent()
         result = agent.update_event(event_id=event_id, **update_kwargs)
         
-        logger.info(f"✅ Calendar event updated: {event_id}")
+        logger.info(f"✅ Event updated")
         return result
         
     except Exception as e:
-        logger.error(f"Failed to update calendar event: {e}")
+        logger.error(f"❌ Error updating event: {e}", exc_info=True)
         return {
             'success': False,
-            'message': f"❌ Error updating event: {str(e)}"
+            'message': f"❌ Error: {str(e)}"
         }
 
+def delete_calendar_event(event_id: str):
+    """
+    Delete event from Google Calendar
+    
+    Args:
+        event_id: Event ID to delete
+    
+    Returns:
+        dict: Result with success status and message
+    """
+    try:
+        logger.info(f"🗑️ Deleting event: {event_id}")
+        
+        agent = get_calendar_agent()
+        result = agent.delete_event(event_id=event_id)
+        
+        logger.info(f"✅ Event deleted")
+        return result
+        
+    except Exception as e:
+        logger.error(f"❌ Error deleting event: {e}", exc_info=True)
+        return {
+            'success': False,
+            'message': f"❌ Error: {str(e)}"
+        }
 
-# =====================================================
-# TOOL DEFINITIONS (untuk Gemini Function Calling)
-# =====================================================
+# ====================
+# TOOL DECLARATIONS for Gemini
+# ====================
 
 CALENDAR_TOOLS = [
     {
-        "name": "add_calendar_event",
-        "description": """Add a new event to user's Google Calendar. 
-Use this when user wants to schedule, create, or add an event/meeting/appointment.
-Examples: "jadwalin meeting besok", "buatkan reminder olahraga", "schedule interview".""",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "title": {
-                    "type": "string",
-                    "description": "Event title/summary. Be descriptive but concise."
+        'name': 'add_calendar_event',
+        'description': 'Add a new event to Google Calendar. Use this when user wants to create/add/schedule an event.',
+        'parameters': {
+            'type': 'object',
+            'properties': {
+                'title': {
+                    'type': 'string',
+                    'description': 'Event title/summary'
                 },
-                "date": {
-                    "type": "string",
-                    "description": "Event date in YYYY-MM-DD format. Calculate from relative dates like 'besok', 'minggu depan', etc."
+                'date': {
+                    'type': 'string',
+                    'description': 'Event date in YYYY-MM-DD format (e.g. "2024-12-25")'
                 },
-                "time": {
-                    "type": "string",
-                    "description": "Event start time in HH:MM format (24-hour). Convert keywords: 'pagi'=09:00, 'siang'=12:00, 'sore'=15:00, 'malam'=19:00"
+                'time': {
+                    'type': 'string',
+                    'description': 'Event time in HH:MM format (e.g. "14:00" for 2 PM)'
                 },
-                "duration": {
-                    "type": "integer",
-                    "description": "Event duration in minutes. Default: 60. Convert hours to minutes (1 jam = 60 menit)."
+                'duration': {
+                    'type': 'integer',
+                    'description': 'Event duration in minutes (default: 60)'
                 },
-                "description": {
-                    "type": "string",
-                    "description": "Optional event description or notes."
+                'description': {
+                    'type': 'string',
+                    'description': 'Event description/notes (optional)'
                 }
             },
-            "required": ["title", "date", "time"]
+            'required': ['title', 'date', 'time']
         }
     },
     {
-        "name": "list_calendar_events",
-        "description": """List upcoming events from user's Google Calendar.
-Use this when user wants to see, check, or view their schedule/agenda.
-Examples: "apa jadwalku hari ini?", "tampilkan agenda minggu ini", "list my events".""",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "date": {
-                    "type": "string",
-                    "description": "Specific date in YYYY-MM-DD format to show events for that day only. Leave null for range."
+        'name': 'list_calendar_events',
+        'description': 'List events from Google Calendar. Use this when user wants to see/check their schedule.',
+        'parameters': {
+            'type': 'object',
+            'properties': {
+                'date': {
+                    'type': 'string',
+                    'description': 'Specific date in YYYY-MM-DD format. If provided, only shows events on that date. Leave empty to show upcoming events.'
                 },
-                "days": {
-                    "type": "integer",
-                    "description": "Number of days ahead to fetch events (used if date is null). Default: 7"
+                'days': {
+                    'type': 'integer',
+                    'description': 'Number of days to fetch (default: 7). Only used if date is not provided.'
                 }
             },
-            "required": []
+            'required': []
         }
     },
     {
-        "name": "delete_calendar_event",
-        "description": """Delete an event from user's Google Calendar.
-Use this when user wants to remove, cancel, or delete an event.
-You MUST get the event_id first by calling list_calendar_events if user doesn't provide it.
-Examples: "hapus meeting hari ini", "cancel event abc123", "batalkan janji".""",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "event_id": {
-                    "type": "string",
-                    "description": "Google Calendar event ID. Get this from list_calendar_events first if not provided by user."
+        'name': 'update_calendar_event',
+        'description': 'Update an existing event in Google Calendar. Use this when user wants to modify/change an event.',
+        'parameters': {
+            'type': 'object',
+            'properties': {
+                'event_id': {
+                    'type': 'string',
+                    'description': 'Event ID to update (get from list_calendar_events)'
+                },
+                'title': {
+                    'type': 'string',
+                    'description': 'New title (optional)'
+                },
+                'date': {
+                    'type': 'string',
+                    'description': 'New date in YYYY-MM-DD format (optional)'
+                },
+                'time': {
+                    'type': 'string',
+                    'description': 'New time in HH:MM format (optional)'
+                },
+                'duration': {
+                    'type': 'integer',
+                    'description': 'New duration in minutes (optional)'
+                },
+                'description': {
+                    'type': 'string',
+                    'description': 'New description (optional)'
                 }
             },
-            "required": ["event_id"]
+            'required': ['event_id']
         }
     },
     {
-        "name": "update_calendar_event",
-        "description": """Update an existing event in user's Google Calendar.
-Use this when user wants to modify, change, or reschedule an event.
-You MUST get the event_id first by calling list_calendar_events if user doesn't provide it.
-Examples: "ubah meeting jadi besok", "reschedule to 3pm", "ganti judulnya".""",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "event_id": {
-                    "type": "string",
-                    "description": "Google Calendar event ID. Get this from list_calendar_events first."
-                },
-                "title": {
-                    "type": "string",
-                    "description": "New event title (optional)"
-                },
-                "date": {
-                    "type": "string",
-                    "description": "New date in YYYY-MM-DD (optional)"
-                },
-                "time": {
-                    "type": "string",
-                    "description": "New time in HH:MM (optional)"
-                },
-                "duration": {
-                    "type": "integer",
-                    "description": "New duration in minutes (optional)"
-                },
-                "description": {
-                    "type": "string",
-                    "description": "New description (optional)"
+        'name': 'delete_calendar_event',
+        'description': 'Delete an event from Google Calendar. Use this when user wants to remove/cancel an event.',
+        'parameters': {
+            'type': 'object',
+            'properties': {
+                'event_id': {
+                    'type': 'string',
+                    'description': 'Event ID to delete (get from list_calendar_events)'
                 }
             },
-            "required": ["event_id"]
+            'required': ['event_id']
         }
     }
 ]
