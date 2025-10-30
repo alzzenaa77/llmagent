@@ -31,8 +31,6 @@ Berinteraksi dengan user melalui Discord bot <br>
 ## 📦 *Tech Stack Flow*
 <img width="993" height="474" alt="Screenshot 2025-10-30 192044" src="https://github.com/user-attachments/assets/5762f0ab-3a2e-42f2-8208-459c120e8858" />
 
-# 🤖 SchedBot - AI Calendar Assistant
-
 ## 🏗️ Project Structure
 
 ```
@@ -69,7 +67,7 @@ LLMAGENT/
 
 ```bash
 git clone https://github.com/alzzenaa77/llmagent.git
-cd schedbot
+cd llmagent
 ```
 
 ### 2. Create Virtual Environment
