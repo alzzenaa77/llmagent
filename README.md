@@ -138,7 +138,48 @@ mv ~/Downloads/client_secret_*.json credentials/credentials.json
    - Select your Google Cloud project
    - Copy the API key
 
-### Step 3: Setup Environment Variables
+### Step 3: Get Discord Bot Token (Optional - for Discord Bot)
+
+1. **Go to [Discord Developer Portal](https://discord.com/developers/applications)**
+   - Login dengan akun Discord Anda
+
+2. **Create New Application**
+   - Klik tombol "New Application"
+   - Beri nama (misal: "SchedBot")
+   - Klik "Create"
+
+3. **Create Bot**
+   - Di sidebar kiri, klik "Bot"
+   - Klik tombol "Add Bot"
+   - Konfirmasi dengan klik "Yes, do it!"
+
+4. **Get Bot Token**
+   - Di halaman Bot, scroll ke bagian "TOKEN"
+   - Klik "Reset Token" (jika token belum pernah dibuat)
+   - Klik "Copy" untuk menyalin token
+   - ⚠️ **PENTING**: Token ini hanya ditampilkan SEKALI! Simpan dengan aman.
+
+5. **Configure Bot Permissions**
+   
+   Di bagian "Privileged Gateway Intents", aktifkan:
+   - ✅ MESSAGE CONTENT INTENT (wajib untuk membaca pesan)
+   - ✅ SERVER MEMBERS INTENT (optional)
+   - ✅ PRESENCE INTENT (optional)
+
+6. **Invite Bot to Server**
+   - Di sidebar kiri, klik "OAuth2" → "URL Generator"
+   - Di SCOPES, centang:
+     - ✅ `bot`
+   - Di BOT PERMISSIONS, centang:
+     - ✅ `Send Messages`
+     - ✅ `Read Message History`
+     - ✅ `Read Messages/View Channels`
+   - Copy "Generated URL" di bagian bawah
+   - Paste URL ke browser
+   - Pilih server Discord Anda
+   - Klik "Authorize"
+   
+### Step 4: Setup Environment Variables
 
 Create a `.env` file in the project root:
 
@@ -150,12 +191,12 @@ DISCORD_TOKEN=your_discord_bot_token_here
 
 ⚠️ **Security Note:** Never commit `.env` file to git! It's already in `.gitignore`.
 
-### Step 4: Verify Directory Structure
+### Step 5: Verify Directory Structure
 
 Ensure your directory looks like this:
 
 ```
-schedbot/
+llmagent/
 ├── credentials/
 │   ├── credentials.json    # Google OAuth credentials
 │   └── token.json          # Auto-generated after first auth
@@ -167,15 +208,15 @@ schedbot/
 
 ## 🚀 Usage
 
-### Option 1: CLI Mode (Command Line Interface)
+ CLI Mode (Command Line Interface)
 
-Use the interactive command-line interface:
+Use the interactive command-line Discord interface:
 
 ```bash
 python main.py
 ```
 
-**Example Commands:**
+**Example Commands in Discord:**
 
 ```
 You: tambahkan meeting besok jam 2 siang
@@ -191,23 +232,6 @@ Bot: ✅ Event "Morning Standup" berhasil dihapus
 
 You: exit
 Bot: Bye! 👋
-```
-
-### Option 2: Discord Bot
-
-Run the Discord bot:
-
-```bash
-python -m bot.discord_bot
-```
-
-**Discord Commands:**
-
-```
-!schedbot tambahkan rapat besok jam 3
-!schedbot jadwalku minggu ini
-!schedbot help
-!schedbot clear
 ```
 
 ### First Run: Google Calendar Authentication
@@ -290,8 +314,7 @@ pytest --cov=agent --cov-report=html
 
 - Google Gemini AI for natural language processing
 - Google Calendar API for calendar integration
-- Anthropic Claude for development assistance
-
+-  Discord token for bot interface
 
 
 
