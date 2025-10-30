@@ -40,36 +40,36 @@ Berinteraksi dengan user melalui Discord bot <br>
    
 
 ## 📂 Struktur Proyek
-LLMAGENT/
-├─ agent/
-│  ├─ tools/
-│  │  ├─ __init__.py                # Mendaftarkan tool untuk agent
-│  │  ├─ calendar_tools.py          # Tool utilitas kalender (create, read, update)
-│  │
-│  ├─ calendar_agent.py             # Agent untuk manajemen kalender
-│  ├─ llm_agent.py                  # Core logic & reasoning LLM
-│
-│  ├─ bot/
-│  │  ├─ discord_bot.py             # Integrasi dengan Discord bot
-│
-│  ├─ credentials/
-│  │  ├─ credentials.json           # Data client API
-│  │  └─ token.json                 # Token autentikasi
-│
-├─ node_modules/                    # Dependensi npm
-│
-├─ tests/
-│  ├─ test_calendar.py              # Unit test untuk fungsi kalender
-│
-├─ .env                             # Variabel lingkungan
-├─ .gitignore                       # File untuk mengecualikan dari git tracking
-├─ main.py                          # Entry point utama
-├─ package.json                     # Konfigurasi npm dependencies
-├─ package-lock.json                # Lock versi npm dependencies
-├─ README.md                        # Dokumentasi proyek
-├─ requirements.txt                 # Dependensi Python
-├─ test_agent.py                    # Unit test untuk agent
-└─ test_tools_wrapper.py            # Test untuk wrapper tools
+LLMAGENT/<br>
+├─ agent/<br>
+│  ├─ tools/<br>
+│  │  ├─ __init__.py                # Mendaftarkan tool untuk agent<br>
+│  │  ├─ calendar_tools.py          # Tool utilitas kalender (create, read, update)<br>
+│  │<br>
+│  ├─ calendar_agent.py             # Agent untuk manajemen kalender<br>
+│  ├─ llm_agent.py                  # Core logic & reasoning LLM<br>
+│<br>
+│  ├─ bot/<br>
+│  │  ├─ discord_bot.py             # Integrasi dengan Discord bot<br>
+│<br>
+│  ├─ credentials/<br>
+│  │  ├─ credentials.json           # Data client API<br>
+│  │  └─ token.json                 # Token autentikasi<br>
+│<br>
+├─ node_modules/                    # Dependensi npm<br>
+│<br>
+├─ tests/<br>
+│  ├─ test_calendar.py              # Unit test untuk fungsi kalender<br>
+│<br>
+├─ .env                             # Variabel lingkungan<br>
+├─ .gitignore                       # File untuk mengecualikan dari git tracking<br>
+├─ main.py                          # Entry point utama<br>
+├─ package.json                     # Konfigurasi npm dependencies<br>
+├─ package-lock.json                # Lock versi npm dependencies<br>
+├─ README.md                        # Dokumentasi proyek<br>
+├─ requirements.txt                 # Dependensi Python<br>
+├─ test_agent.py                    # Unit test untuk agent<br>
+└─ test_tools_wrapper.py            # Test untuk wrapper tools<br>
 
 
 ## 📦 *Tech Stack Flow*
